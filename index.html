@@ -316,18 +316,18 @@
             const handleSaveDaily = async () => {
                 const newLog = { 
                 ...formData, 
-                date: new Date().toISOString(), // 로컬용 시간 (앱 내 정렬/구분용)
-                targetDate: formData.logDate,
+                date: new Date().toISOString(), // 앱 내부 정렬용 고유값
+                logDate: formData.logDate, // 기록일 추가
                 type: 'DAILY' 
                 };
                 
-                // 구글 시트용 데이터 클렌징 (이모지 제거, 날짜 덮어쓰기)
+                // 구글 시트용 데이터 클렌징 (이모지 제거, 기록일 통합)
                 const sheetPayload = {
                     ...newLog,
-                    date: formData.logDate, // A열(기록시간)에 선택한 달력 날짜 덮어쓰기
-                    targetDate: formData.logDate, // B열(목표날짜)에 선택한 달력 날짜 덮어쓰기
-                    diet_tags: newLog.diet_tags.map(tag => tag.includes(' ') ? tag.split(' ')[1] : tag) // 이모지 제거 ("🥩 육류" -> "육류")
+                    date: formData.logDate, // A열(기록일)에 달력 날짜 1개만 매핑
+                    diet_tags: newLog.diet_tags.map(tag => tag.includes(' ') ? tag.split(' ')[1] : tag) 
                 };
+                // targetDate는 삭제되었습니다.
 
                 setLogs([newLog, ...logs]);
                 await sendDataToGoogleSheet(sheetPayload);
@@ -341,8 +341,8 @@
             const handleSaveEmergency = async () => {
                 const newLog = { 
                 ...emergencyData, 
-                date: new Date().toISOString(), // 로컬용 시간
-                targetDate: getTodayString(),
+                date: new Date().toISOString(), 
+                logDate: getTodayString(), // 긴급은 오늘 날짜로 기록일 지정
                 type: 'EMERGENCY',
                 diet_tags: formData.diet_tags 
                 };
@@ -350,10 +350,10 @@
                 // 구글 시트용 데이터 클렌징
                 const sheetPayload = {
                     ...newLog,
-                    date: getTodayString(), // 긴급 에러도 오늘 날짜로 덮어쓰기
-                    targetDate: getTodayString(),
+                    date: getTodayString(), // A열(기록일)에 오늘 날짜 매핑
                     diet_tags: newLog.diet_tags ? newLog.diet_tags.map(tag => tag.includes(' ') ? tag.split(' ')[1] : tag) : []
                 };
+                // targetDate는 삭제되었습니다.
 
                 setLogs([newLog, ...logs]);
                 await sendDataToGoogleSheet(sheetPayload);
@@ -616,8 +616,8 @@
                                 <div className="flex justify-between items-start mb-3">
                                     <div className="flex flex-col">
                                     <span className="text-xs font-bold text-gray-400 dark:text-gray-500 mb-1">
-                                        {/* 한국 시간 포맷으로 저장된 date 값에서 첫 띄어쓰기 기준 앞(날짜)만 자르거나 targetDate 표시 */}
-                                        {log.targetDate || (log.date && typeof log.date === 'string' ? log.date.split(' ')[0] : '')}
+                                        {/* 기록일만 깔끔하게 표시되도록 수정 */}
+                                        {log.logDate || log.targetDate || (log.date && typeof log.date === 'string' && log.date.includes('T') ? log.date.split('T')[0] : log.date)}
                                     </span>
                                     <span className={`text-[10px] font-black px-2.5 py-1 rounded-md w-fit ${log.type === 'EMERGENCY' ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}>
                                         {log.type}
