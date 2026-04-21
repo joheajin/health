@@ -1,703 +1,711 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  Activity, Moon, Sun, AlertCircle, XCircle, FileText, 
-  CheckCircle, Coffee, TrendingUp, AlertTriangle, Calendar, Clock, Droplets
-} from 'lucide-react';
-
-// --- Helper Functions ---
-const getTodayString = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
-// --- Components ---
-
-const ToggleButton = ({ label, value, onChange, icon: Icon }) => (
-  <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
-    <div className="flex items-center space-x-3">
-      <div className="p-2 bg-gray-50 dark:bg-gray-700 rounded-lg">
-        {Icon && <Icon className="w-5 h-5 text-gray-600 dark:text-gray-300" />}
-      </div>
-      <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{label}</span>
-    </div>
-    <div className="flex space-x-2 bg-gray-100 dark:bg-gray-900 p-1 rounded-xl">
-      <button
-        onClick={() => onChange(true)}
-        className={`px-5 py-2 rounded-lg font-bold transition-all ${
-          value === true ? 'bg-blue-500 text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-        }`}
-      >
-        O
-      </button>
-      <button
-        onClick={() => onChange(false)}
-        className={`px-5 py-2 rounded-lg font-bold transition-all ${
-          value === false ? 'bg-red-500 text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-        }`}
-      >
-        X
-      </button>
-    </div>
-  </div>
-);
-
-const TagSelector = ({ label, selectedTags, onChange, options }) => {
-  const toggleTag = (tag) => {
-    if (selectedTags.includes(tag)) {
-      onChange(selectedTags.filter(t => t !== tag));
-    } else {
-      onChange([...selectedTags, tag]);
-    }
-  };
-
-  return (
-    <div className="flex flex-col space-y-3 p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
-      <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{label}</span>
-      <div className="flex flex-wrap gap-2">
-        {options.map((tag) => {
-          const isSelected = selectedTags.includes(tag);
-          return (
-            <button
-              key={tag}
-              onClick={() => toggleTag(tag)}
-              className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border ${
-                isSelected 
-                  ? 'bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700 shadow-sm' 
-                  : 'bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'
-              }`}
-            >
-              {tag}
-            </button>
-          );
-        })}
-      </div>
-      {selectedTags.length === 0 && (
-        <p className="text-xs text-green-600 dark:text-green-400 font-medium">선택된 부하 태그가 없습니다. (안정적 식단 🥗)</p>
-      )}
-    </div>
-  );
-};
-
-const VisualSlider = ({ label, value, onChange, min = 0, max = 5, step = 1, warningThreshold = null, isLowWarning = false, emojis }) => {
-  let isWarning = false;
-  if (warningThreshold !== null) {
-    if (isLowWarning) isWarning = value <= warningThreshold;
-    else isWarning = value >= warningThreshold;
-  }
-
-  return (
-    <div className="flex flex-col space-y-3 p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
-      <div className="flex justify-between items-center">
-        <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{label}</span>
-        <div className="flex items-center space-x-2">
-          <span className="text-2xl">{emojis ? emojis[value] : ''}</span>
-          <span className={`text-xl font-black ${isWarning ? 'text-red-500 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>
-            {value}
-          </span>
-        </div>
-      </div>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full h-3 bg-gray-200 dark:bg-gray-700 rounded-full appearance-none cursor-pointer accent-blue-600 dark:accent-blue-400"
-      />
-      <div className="flex justify-between text-xs font-medium text-gray-400 dark:text-gray-500">
-        <span>{min}</span>
-        <span>{max}</span>
-      </div>
-    </div>
-  );
-};
-
-const WaterGauge = ({ label, value, onChange, max = 8, target = 4 }) => {
-  const segments = Array.from({ length: max }, (_, i) => i + 1);
-
-  return (
-    <div className="flex flex-col space-y-3 p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
-      <div className="flex justify-between items-center">
-        <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{label}</span>
-        <div className="flex items-center space-x-2">
-          <Droplets className={`w-5 h-5 ${value >= target ? 'text-blue-500' : 'text-red-400'}`} />
-          <span className={`text-xl font-black ${value >= target ? 'text-blue-600 dark:text-blue-400' : 'text-red-500 dark:text-red-400'}`}>
-            {value}잔
-          </span>
-        </div>
-      </div>
-
-      <div className="flex space-x-1.5 h-10">
-        {segments.map((seg) => {
-          const isFilled = seg <= value;
-          // 1~2잔: 붉은색(위험), 3잔: 연파랑(주의), 4잔 이상: 파란색(목표달성)
-          let filledColor = 'bg-blue-500';
-          if (seg <= 2) filledColor = 'bg-red-400';
-          else if (seg === 3) filledColor = 'bg-blue-300';
-
-          return (
-            <button
-              key={seg}
-              onClick={() => onChange(seg === value ? seg - 1 : seg)}
-              className={`flex-1 rounded-lg transition-all duration-300 border-b-4 ${
-                isFilled
-                  ? `${filledColor} border-black/20 scale-100 opacity-100 shadow-sm`
-                  : 'bg-gray-100 dark:bg-gray-700 border-transparent scale-95 opacity-50 hover:opacity-80'
-              }`}
-            />
-          );
-        })}
-      </div>
-
-      <div className="flex justify-between text-[10px] font-bold text-gray-400 dark:text-gray-500">
-        <span>0잔 (위험)</span>
-        <span className="text-blue-500">목표 {target}잔</span>
-        <span>{max}잔 (MAX)</span>
-      </div>
-    </div>
-  );
-};
-
-const HeadacheGauge = ({ label, value, onChange }) => {
-  const segments = [1, 2, 3, 4, 5];
-  const emojis = ['😊', '🤔', '😣', '🤕', '🤯', '💀'];
-
-  return (
-    <div className="flex flex-col space-y-3 p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
-      <div className="flex justify-between items-center">
-        <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{label}</span>
-        <div className="flex items-center space-x-2">
-          <span className="text-2xl">{emojis[value]}</span>
-          <span className={`text-xl font-black ${value >= 3 ? 'text-red-500 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>
-            Level {value}
-          </span>
-        </div>
-      </div>
-
-      <div className="flex space-x-1.5 h-10">
-        {segments.map((seg) => {
-          const isFilled = seg <= value;
-          let filledColor = 'bg-blue-500';
-          if (seg >= 4) filledColor = 'bg-red-500';
-          else if (seg === 3) filledColor = 'bg-orange-500';
-
-          return (
-            <button
-              key={seg}
-              onClick={() => onChange(seg === value ? seg - 1 : seg)}
-              className={`flex-1 rounded-lg transition-all duration-300 border-b-4 ${
-                isFilled
-                  ? `${filledColor} border-black/20 scale-100 opacity-100 shadow-sm`
-                  : 'bg-gray-100 dark:bg-gray-700 border-transparent scale-95 opacity-50 hover:opacity-80'
-              }`}
-            />
-          );
-        })}
-      </div>
-
-      <div className="flex justify-between text-[10px] font-bold text-gray-400 dark:text-gray-500">
-        <span>0 (없음)</span>
-        <span className="text-orange-500">3 (경고)</span>
-        <span className="text-red-500">5 (최악)</span>
-      </div>
-    </div>
-  );
-};
-
-const TextRadio = ({ label, value, onChange, options }) => (
-  <div className="flex flex-col space-y-3 p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
-    <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{label}</span>
-    <div className="flex space-x-2 bg-gray-100 dark:bg-gray-900 p-1 rounded-xl">
-      {options.map((opt) => (
-        <button
-          key={opt}
-          onClick={() => onChange(opt)}
-          className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${
-            value === opt ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800'
-          }`}
-        >
-          {opt}
-        </button>
-      ))}
-    </div>
-  </div>
-);
-
-export default function App() {
-  // Theme State
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    const saved = localStorage.getItem('phls_theme');
-    return saved ? JSON.parse(saved) : true; // 라이트 모드에서 다크 모드 기본으로 변경
-  });
-
-  // --- GAS 연동 설정 ---
-  // 아래 따옴표 안에 복사하신 구글 Apps Script 웹앱 URL을 붙여넣으세요.
-  const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwo5xUbBBY86JcAWsUYN8GqUShMHUGoBCuIh7uF37tqka-kYjLeaKnmUwXKyo5ztsqK/exec"; 
-
-  const [activeTab, setActiveTab] = useState('input');
-  const [showEmergency, setShowEmergency] = useState(false);
-
-  // Data States with LocalStorage Persistence
-  const initialForm = {
-    logDate: getTodayString(),
-    diet_tags: [], 
-    chew_30: false,
-    eat_slowly: false, // 20분 이상 식사하기
-    fasting_4hr: false, // 취침 전 4시간 공복
-    water_cups: 0, // 하루 수분 섭취 (목표: 4잔)
-    headache_lv: 0,
-    indigestion: '편안', // 숫자에서 텍스트로 변경
-    memo: ''
-  };
-
-  const [formData, setFormData] = useState(() => {
-    const saved = localStorage.getItem('phls_formData_v1_5');
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      if (!parsed.logDate) parsed.logDate = getTodayString();
-      if (!parsed.diet_tags) parsed.diet_tags = [];
-      if (parsed.water_cups === undefined) parsed.water_cups = 0;
-      return parsed;
-    }
-    return initialForm;
-  });
-
-  const [logs, setLogs] = useState(() => {
-    const saved = localStorage.getItem('phls_logs_v1_5');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [emergencyData, setEmergencyData] = useState({
-    time: '',
-    headache_lv: 3,
-    indigestion: '불편', // 숫자에서 텍스트로 변경
-    memo: '갑작스러운 두통/체기 감지'
-  });
-
-  useEffect(() => localStorage.setItem('phls_theme', JSON.stringify(isDarkMode)), [isDarkMode]);
-  useEffect(() => localStorage.setItem('phls_formData_v1_5', JSON.stringify(formData)), [formData]);
-  useEffect(() => localStorage.setItem('phls_logs_v1_5', JSON.stringify(logs)), [logs]);
-
-  const updateForm = (key, value) => setFormData(prev => ({ ...prev, [key]: value }));
-
-  // 구글 시트로 데이터 전송하는 함수
-  const sendDataToGoogleSheet = async (dataPayload) => {
-    if (!GAS_WEB_APP_URL) return; // URL이 없으면 로컬에만 저장하고 조용히 넘어감
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>4D-Clean PHLS</title>
     
-    try {
-      await fetch(GAS_WEB_APP_URL, {
-        method: 'POST',
-        mode: 'no-cors', // 브라우저 CORS 정책 우회를 위해 필수
-        headers: {
-          'Content-Type': 'text/plain;charset=utf-8',
-        },
-        body: JSON.stringify(dataPayload)
-      });
-      // no-cors 모드에서는 response 확인이 불가하므로 에러가 안나면 성공으로 간주합니다.
-    } catch (error) {
-      console.error("구글 시트 전송 실패:", error);
-    }
-  };
-
-  const handleSaveDaily = async () => {
-    const newLog = { 
-      ...formData, 
-      date: new Date().toISOString(),
-      targetDate: formData.logDate,
-      type: 'DAILY' 
-    };
+    <!-- Tailwind CSS (디자인 프레임워크) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = { darkMode: 'class' }
+    </script>
     
-    // 1. 로컬 스토리지 업데이트
-    setLogs([newLog, ...logs]);
+    <!-- React (핵심 엔진) -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     
-    // 2. 구글 시트로 전송 (백그라운드)
-    await sendDataToGoogleSheet(newLog);
-    
-    // Reset but keep today's date
-    setFormData({ ...initialForm, logDate: getTodayString() }); 
-    setActiveTab('dashboard');
-    window.scrollTo(0, 0);
-  };
+    <!-- Babel (브라우저 코드 번역기) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  const handleSaveEmergency = async () => {
-    const newLog = { 
-      ...emergencyData, 
-      date: new Date().toISOString(), 
-      targetDate: getTodayString(),
-      type: 'EMERGENCY',
-      diet_tags: formData.diet_tags // Snapshot of current tags
-    };
-    
-    // 1. 로컬 스토리지 업데이트
-    setLogs([newLog, ...logs]);
-    
-    // 2. 구글 시트로 전송 (백그라운드)
-    await sendDataToGoogleSheet(newLog);
-    
-    setShowEmergency(false);
-    setActiveTab('dashboard');
-    window.scrollTo(0, 0);
-  };
+    <style>
+        /* 모바일 터치 하이라이트 제거 */
+        * { -webkit-tap-highlight-color: transparent; }
+        body { background-color: #111827; } /* 다크모드 로딩 시 번쩍임 방지 */
+    </style>
+</head>
+<body>
+    <div id="root"></div>
 
-  const openEmergencyLog = () => {
-    const now = new Date();
-    setEmergencyData({
-      ...emergencyData,
-      time: `${now.getHours()}:${now.getMinutes() < 10 ? '0' : ''}${now.getMinutes()}`
-    });
-    setShowEmergency(true);
-  };
+    <script type="text/babel">
+        const { useState, useEffect } = React;
 
-  // Focused Analysis Logic
-  const getAnalysis = () => {
-    const severeHeadaches = logs.filter(l => l.headache_lv >= 3);
-    const totalSevere = severeHeadaches.length;
-    
-    if (totalSevere === 0) return null;
+        // --- 외부 라이브러리(Lucide) 오류 방지를 위한 자체 SVG 아이콘 컴포넌트 구현 ---
+        const SvgIcon = ({ children, className = "w-5 h-5", ...props }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...props}>
+                {children}
+            </svg>
+        );
 
-    // Calculate most frequent tags on headache days
-    const tagCounts = {};
-    severeHeadaches.forEach(log => {
-      if (log.diet_tags) {
-        log.diet_tags.forEach(tag => {
-          tagCounts[tag] = (tagCounts[tag] || 0) + 1;
-        });
-      }
-    });
+        const Activity = (p) => <SvgIcon {...p}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></SvgIcon>;
+        const Moon = (p) => <SvgIcon {...p}><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></SvgIcon>;
+        const Sun = (p) => <SvgIcon {...p}><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></SvgIcon>;
+        const AlertCircle = (p) => <SvgIcon {...p}><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></SvgIcon>;
+        const XCircle = (p) => <SvgIcon {...p}><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></SvgIcon>;
+        const FileText = (p) => <SvgIcon {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></SvgIcon>;
+        const CheckCircle = (p) => <SvgIcon {...p}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></SvgIcon>;
+        const Coffee = (p) => <SvgIcon {...p}><path d="M18 8h1a4 4 0 0 1 0 8h-1"></path><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"></path><line x1="6" y1="1" x2="6" y2="4"></line><line x1="10" y1="1" x2="10" y2="4"></line><line x1="14" y1="1" x2="14" y2="4"></line></SvgIcon>;
+        const TrendingUp = (p) => <SvgIcon {...p}><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline><polyline points="17 6 23 6 23 12"></polyline></SvgIcon>;
+        const AlertTriangle = (p) => <SvgIcon {...p}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></SvgIcon>;
+        const Calendar = (p) => <SvgIcon {...p}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></SvgIcon>;
+        const Clock = (p) => <SvgIcon {...p}><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></SvgIcon>;
+        const Droplets = (p) => <SvgIcon {...p}><path d="M7 16.3c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S7 2.99 7 2.99s-2.29 6.07-2.29 8.26c0 2.22 1.8 4.05 4 4.05z"></path><path d="M14.5 18c2.2 0 4-1.83 4-4.05 0-1.16-.57-2.26-1.71-3.19S14.5 4.68 14.5 4.68s-2.29 6.07-2.29 8.26c0 2.22 1.8 4.05 4 4.05z"></path></SvgIcon>;
 
-    const topTags = Object.entries(tagCounts)
-      .sort((a, b) => b[1] - a[1])
-      .map(entry => ({ name: entry[0], count: entry[1], ratio: Math.round((entry[1] / totalSevere) * 100) }))
-      .slice(0, 2);
+        // --- Helper Functions ---
+        const getTodayString = () => {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        };
 
-    // Calculate failure rates of key habits on headache days
-    const fastingFailRate = Math.round((severeHeadaches.filter(l => l.fasting_4hr === false).length / totalSevere) * 100);
-    const fastEatingFailRate = Math.round((severeHeadaches.filter(l => l.eat_slowly === false).length / totalSevere) * 100);
-    const waterFailRate = Math.round((severeHeadaches.filter(l => l.water_cups <= 2).length / totalSevere) * 100); // 2잔 이하면 수분 부족으로 간주
-
-    return {
-      total: totalSevere,
-      topTags: topTags,
-      fastingFailRate,
-      fastEatingFailRate,
-      waterFailRate
-    };
-  };
-
-  const analysis = getAnalysis();
-
-  return (
-    <div className={isDarkMode ? 'dark' : ''}>
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-sans pb-24 transition-colors duration-300">
-        
-        {/* Header */}
-        <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 transition-colors">
-          <div className="max-w-md mx-auto px-4 py-4 flex justify-between items-center">
-            <div className="flex items-center space-x-2">
-              <Activity className="w-7 h-7 text-blue-600 dark:text-blue-400" />
-              <h1 className="text-xl font-black tracking-tight">PHLS <span className="text-blue-600 dark:text-blue-400">Core</span></h1>
-            </div>
-            <div className="flex items-center space-x-3">
-              <button 
-                onClick={() => setIsDarkMode(!isDarkMode)} 
-                className="p-2.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-              >
-                {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              </button>
-            </div>
-          </div>
-          
-          {/* Navigation Tabs */}
-          <div className="flex px-4 pb-0 bg-white dark:bg-gray-800 pt-2">
-            <button 
-              onClick={() => setActiveTab('input')}
-              className={`flex-1 py-3 text-sm font-black border-b-[3px] transition-colors ${activeTab === 'input' ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-gray-400 dark:text-gray-500'}`}
-            >
-              Daily Input
-            </button>
-            <button 
-              onClick={() => setActiveTab('dashboard')}
-              className={`flex-1 py-3 text-sm font-black border-b-[3px] transition-colors ${activeTab === 'dashboard' ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-gray-400 dark:text-gray-500'}`}
-            >
-              Dashboard
-            </button>
-          </div>
-        </header>
-
-        <main className="max-w-md mx-auto px-4 py-6">
-          
-          {/* --- INPUT TAB --- */}
-          {activeTab === 'input' && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-              
-              {/* Date Selector */}
-              <div className="flex items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
-                <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-300">
-                  <Calendar className="w-5 h-5" />
-                  <span className="font-bold text-sm">기록 날짜</span>
+        // --- Components ---
+        const ToggleButton = ({ label, value, onChange, icon: Icon }) => (
+            <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
+                <div className="flex items-center space-x-3">
+                <div className="p-2 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    {Icon && <Icon className="w-5 h-5 text-gray-600 dark:text-gray-300" />}
                 </div>
-                <input 
-                  type="date" 
-                  value={formData.logDate}
-                  onChange={(e) => updateForm('logDate', e.target.value)}
-                  className="font-bold text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-2 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
-                />
-              </div>
-
-              {/* 1. 식습관 (Input) */}
-              <section className="space-y-3">
-                <h2 className="text-lg font-black flex items-center text-gray-800 dark:text-gray-100 ml-1">
-                  <Coffee className="w-5 h-5 mr-2 text-amber-500" /> 1. 식습관 (Input)
-                </h2>
-                
-                <TagSelector 
-                  label="위장 부하 유발 요인 (복수 선택)" 
-                  selectedTags={formData.diet_tags} 
-                  onChange={(v) => updateForm('diet_tags', v)}
-                  options={['🥩 육류', '🍞 밀가루', '💥 과식', '🌙 야식', '🍪 간식', '☕ 커피', '🍜 라면', '🥤 탄산음료']}
-                />
-                
-                <ToggleButton 
-                  label="식사 시 30회 씹기" 
-                  value={formData.chew_30} 
-                  onChange={(v) => updateForm('chew_30', v)} 
-                  icon={CheckCircle} 
-                />
-                
-                <ToggleButton 
-                  label="20분 이상 식사하기" 
-                  value={formData.eat_slowly} 
-                  onChange={(v) => updateForm('eat_slowly', v)} 
-                  icon={Clock} 
-                />
-
-                <ToggleButton 
-                  label="취침 전 공복 4시간 유지" 
-                  value={formData.fasting_4hr} 
-                  onChange={(v) => updateForm('fasting_4hr', v)} 
-                  icon={Moon} 
-                />
-
-                <div className="pt-2">
-                  <WaterGauge 
-                    label="하루 식간 수분 섭취 (1잔 ≈ 250ml)" 
-                    value={formData.water_cups} 
-                    onChange={(v) => updateForm('water_cups', v)} 
-                  />
-                  <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 ml-2">※ 식사 중 섭취 제외, 식간에 틈틈이</p>
+                <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{label}</span>
                 </div>
-              </section>
-
-              {/* 2. 결과 로그 (Outcome) */}
-              <section className="space-y-3 pt-4">
-                <h2 className="text-lg font-black flex items-center text-blue-600 dark:text-blue-400 ml-1">
-                  <FileText className="w-5 h-5 mr-2" /> 2. 결과 로그 (Outcome)
-                </h2>
-                <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded-2xl border border-blue-100 dark:border-blue-900/50 space-y-3">
-                  <HeadacheGauge 
-                    label="현재 두통 강도" 
-                    value={formData.headache_lv} 
-                    onChange={(v) => updateForm('headache_lv', v)} 
-                  />
-                  <TextRadio 
-                    label="현재 체기 정도" 
-                    value={formData.indigestion} 
-                    onChange={(v) => updateForm('indigestion', v)} 
-                    options={['편안', '불편', '통증']} 
-                  />
-                  <div className="px-4 pb-2">
-                    <textarea 
-                      placeholder="특이사항 메모 (데이터 자동 저장 중...)" 
-                      value={formData.memo}
-                      onChange={(e) => updateForm('memo', e.target.value)}
-                      className="w-full p-4 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm resize-none h-24 shadow-sm"
-                    />
-                  </div>
-                </div>
-              </section>
-
-              <button 
-                onClick={handleSaveDaily}
-                className="w-full bg-blue-600 dark:bg-blue-500 text-white font-black text-lg py-5 rounded-2xl shadow-xl hover:bg-blue-700 dark:hover:bg-blue-600 active:scale-[0.98] transition-all"
-              >
-                오늘의 로그 저장하기
-              </button>
-            </div>
-          )}
-
-          {/* --- DASHBOARD TAB --- */}
-          {activeTab === 'dashboard' && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
-              
-              {analysis ? (
-                <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-6 transition-colors">
-                  <div className="flex items-center space-x-2">
-                    <TrendingUp className="w-6 h-6 text-blue-500" />
-                    <h2 className="text-lg font-black text-gray-800 dark:text-gray-100">위장-두통 상관관계 리포트</h2>
-                  </div>
-                  
-                  <p className="text-sm font-medium text-gray-500 dark:text-gray-400">두통 Level 3 이상 발생 시 위장 습관 실패율입니다.</p>
-                  
-                  {analysis.topTags.length > 0 && (
-                    <div className="bg-orange-50 dark:bg-orange-900/20 p-5 rounded-2xl border border-orange-100 dark:border-orange-900/30">
-                      <h3 className="text-xs font-black text-orange-600 dark:text-orange-400 mb-3 uppercase tracking-wider">주요 유발 음식 태그</h3>
-                      <div className="space-y-3">
-                        {analysis.topTags.map((tag, idx) => (
-                          <div key={idx} className="flex justify-between items-center">
-                            <span className="font-bold text-gray-800 dark:text-gray-200">{tag.name}</span>
-                            <div className="flex items-center space-x-3">
-                              <div className="w-24 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                <div className="h-full bg-orange-500 rounded-full" style={{ width: `${tag.ratio}%` }}></div>
-                              </div>
-                              <span className="text-sm font-black text-orange-600 dark:text-orange-400 w-10 text-right">{tag.ratio}%</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-2xl text-center border border-gray-100 dark:border-gray-700">
-                      <span className="block text-[11px] font-bold text-red-500 dark:text-red-400 mb-1">4시간 공복 실패율</span>
-                      <span className="text-2xl font-black text-gray-800 dark:text-gray-100">{analysis.fastingFailRate}%</span>
-                    </div>
-                    <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-2xl text-center border border-gray-100 dark:border-gray-700">
-                      <span className="block text-[11px] font-bold text-red-500 dark:text-red-400 mb-1">급한 식사 실패율</span>
-                      <span className="text-2xl font-black text-gray-800 dark:text-gray-100">{analysis.fastEatingFailRate}%</span>
-                    </div>
-                    <div className="col-span-2 bg-blue-50 dark:bg-blue-900/20 p-4 rounded-2xl text-center border border-blue-100 dark:border-blue-900/40">
-                      <div className="flex justify-center items-center space-x-2 mb-1">
-                        <Droplets className="w-4 h-4 text-blue-500" />
-                        <span className="block text-xs font-bold text-blue-600 dark:text-blue-400">수분 부족(2잔 이하) 상태 발생률</span>
-                      </div>
-                      <span className="text-2xl font-black text-blue-800 dark:text-blue-200">{analysis.waterFailRate}%</span>
-                      <p className="text-[10px] text-gray-500 mt-1">두통 발생일 기준, 뇌 혈류 부족 의심</p>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl border border-dashed border-gray-300 dark:border-gray-700 text-center text-gray-500 dark:text-gray-400 transition-colors shadow-sm">
-                  <CheckCircle className="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
-                  <p className="font-bold text-gray-700 dark:text-gray-300">건강한 상태가 유지되고 있습니다.</p>
-                  <p className="text-sm mt-2 font-medium">두통 레벨 3 이상의 에러가 발생해야 분석이 활성화됩니다.</p>
-                </div>
-              )}
-
-              <h3 className="font-black text-gray-800 dark:text-gray-100 mt-8 mb-4 ml-1">타임라인 로그</h3>
-              <div className="space-y-3">
-                {logs.length === 0 ? (
-                  <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6 font-medium">기록된 로그가 없습니다.</p>
-                ) : (
-                  logs.map((log, idx) => (
-                    <div key={idx} className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex flex-col">
-                          <span className="text-xs font-bold text-gray-400 dark:text-gray-500 mb-1">
-                            {log.targetDate || new Date(log.date).toISOString().split('T')[0]}
-                          </span>
-                          <span className={`text-[10px] font-black px-2.5 py-1 rounded-md w-fit ${log.type === 'EMERGENCY' ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}>
-                            {log.type}
-                          </span>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-black text-gray-800 dark:text-gray-200">
-                            두통 {log.headache_lv} / 체기 {log.indigestion}
-                          </p>
-                        </div>
-                      </div>
-                      
-                      {log.diet_tags && log.diet_tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mb-2">
-                          {log.diet_tags.map(tag => (
-                            <span key={tag} className="text-[10px] bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 px-2 py-0.5 rounded font-bold border border-orange-100 dark:border-orange-800">
-                              {tag.split(' ')[1] || tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                      
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {log.water_cups !== undefined && (
-                          <span className="text-[10px] bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-1 rounded-lg font-bold border border-blue-100 dark:border-blue-800">
-                            💧 수분 {log.water_cups}잔
-                          </span>
-                        )}
-                        <span className={`text-[10px] px-2 py-1 rounded-lg font-bold border ${log.fasting_4hr ? 'bg-green-50 text-green-600 border-green-100 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' : 'bg-red-50 text-red-600 border-red-100 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800'}`}>
-                          {log.fasting_4hr ? '공복 성공' : '공복 실패'}
-                        </span>
-                      </div>
-
-                      {log.memo && <p className="text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 p-3 rounded-xl mt-3">{log.memo}</p>}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-        </main>
-
-        {/* Floating Action Button for Emergency Log */}
-        <button
-          onClick={openEmergencyLog}
-          className="fixed bottom-6 right-6 w-16 h-16 bg-red-500 text-white rounded-full shadow-red-500/30 shadow-2xl flex items-center justify-center hover:bg-red-600 transition-transform hover:scale-105 active:scale-95 z-40"
-          title="Emergency Log (두통/체기 발생 시 즉시 기록)"
-        >
-          <AlertCircle className="w-8 h-8" />
-        </button>
-
-        {/* Emergency Log Modal */}
-        {showEmergency && (
-          <div className="fixed inset-0 bg-black/60 dark:bg-black/80 z-50 flex items-center justify-center p-4 animate-in fade-in">
-            <div className="bg-white dark:bg-gray-800 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 transition-colors">
-              <div className="bg-red-500 p-5 text-white flex justify-between items-center">
-                <div className="flex items-center space-x-2">
-                  <AlertTriangle className="w-6 h-6" />
-                  <h3 className="font-black text-lg">긴급 에러 스냅샷</h3>
-                </div>
-                <button onClick={() => setShowEmergency(false)}><XCircle className="w-7 h-7 opacity-80 hover:opacity-100 transition-opacity" /></button>
-              </div>
-              
-              <div className="p-6 space-y-5">
-                <p className="text-sm text-gray-600 dark:text-gray-300 font-medium">현재 시각 <strong className="text-gray-900 dark:text-white">({emergencyData.time})</strong> 기준, 직전 행동 패턴을 캡처합니다.</p>
-                
-                <HeadacheGauge 
-                  label="현재 두통 강도" 
-                  value={emergencyData.headache_lv} 
-                  onChange={(v) => setEmergencyData({...emergencyData, headache_lv: v})} 
-                />
-                
-                <TextRadio 
-                  label="현재 체기 정도" 
-                  value={emergencyData.indigestion} 
-                  onChange={(v) => setEmergencyData({...emergencyData, indigestion: v})} 
-                  options={['편안', '불편', '통증']} 
-                />
-                
-                <div className="flex flex-col space-y-2">
-                  <span className="text-sm font-bold text-gray-800 dark:text-gray-200">원인 추정 메모 (선택)</span>
-                  <textarea 
-                    value={emergencyData.memo}
-                    onChange={(e) => setEmergencyData({...emergencyData, memo: e.target.value})}
-                    className="w-full p-4 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm h-24 resize-none transition-colors"
-                  />
-                </div>
-
-                <button 
-                  onClick={handleSaveEmergency}
-                  className="w-full bg-red-500 text-white font-black text-lg py-4 rounded-xl shadow-lg shadow-red-500/20 hover:bg-red-600 active:scale-95 transition-all mt-4"
+                <div className="flex space-x-2 bg-gray-100 dark:bg-gray-900 p-1 rounded-xl">
+                <button
+                    onClick={() => onChange(true)}
+                    className={`px-5 py-2 rounded-lg font-bold transition-all ${
+                    value === true ? 'bg-blue-500 text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    }`}
                 >
-                  즉시 기록 저장
+                    O
                 </button>
-              </div>
+                <button
+                    onClick={() => onChange(false)}
+                    className={`px-5 py-2 rounded-lg font-bold transition-all ${
+                    value === false ? 'bg-red-500 text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    }`}
+                >
+                    X
+                </button>
+                </div>
             </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
+        );
+
+        const TagSelector = ({ label, selectedTags, onChange, options }) => {
+            const toggleTag = (tag) => {
+                if (selectedTags.includes(tag)) {
+                onChange(selectedTags.filter(t => t !== tag));
+                } else {
+                onChange([...selectedTags, tag]);
+                }
+            };
+
+            return (
+                <div className="flex flex-col space-y-3 p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
+                <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{label}</span>
+                <div className="flex flex-wrap gap-2">
+                    {options.map((tag) => {
+                    const isSelected = selectedTags.includes(tag);
+                    return (
+                        <button
+                        key={tag}
+                        onClick={() => toggleTag(tag)}
+                        className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border ${
+                            isSelected 
+                            ? 'bg-orange-100 dark:bg-orange-900/50 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700 shadow-sm' 
+                            : 'bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        }`}
+                        >
+                        {tag}
+                        </button>
+                    );
+                    })}
+                </div>
+                {selectedTags.length === 0 && (
+                    <p className="text-xs text-green-600 dark:text-green-400 font-medium">선택된 부하 태그가 없습니다. (안정적 식단 🥗)</p>
+                )}
+                </div>
+            );
+        };
+
+        const WaterGauge = ({ label, value, onChange, max = 8, target = 4 }) => {
+            const segments = Array.from({ length: max }, (_, i) => i + 1);
+
+            return (
+                <div className="flex flex-col space-y-3 p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
+                <div className="flex justify-between items-center">
+                    <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{label}</span>
+                    <div className="flex items-center space-x-2">
+                    <Droplets className={`w-5 h-5 ${value >= target ? 'text-blue-500' : 'text-red-400'}`} />
+                    <span className={`text-xl font-black ${value >= target ? 'text-blue-600 dark:text-blue-400' : 'text-red-500 dark:text-red-400'}`}>
+                        {value}잔
+                    </span>
+                    </div>
+                </div>
+
+                <div className="flex space-x-1.5 h-10">
+                    {segments.map((seg) => {
+                    const isFilled = seg <= value;
+                    let filledColor = 'bg-blue-500';
+                    if (seg <= 2) filledColor = 'bg-red-400';
+                    else if (seg === 3) filledColor = 'bg-blue-300';
+
+                    return (
+                        <button
+                        key={seg}
+                        onClick={() => onChange(seg === value ? seg - 1 : seg)}
+                        className={`flex-1 rounded-lg transition-all duration-300 border-b-4 ${
+                            isFilled
+                            ? `${filledColor} border-black/20 scale-100 opacity-100 shadow-sm`
+                            : 'bg-gray-100 dark:bg-gray-700 border-transparent scale-95 opacity-50 hover:opacity-80'
+                        }`}
+                        />
+                    );
+                    })}
+                </div>
+
+                <div className="flex justify-between text-[10px] font-bold text-gray-400 dark:text-gray-500">
+                    <span>0잔 (위험)</span>
+                    <span className="text-blue-500">목표 {target}잔</span>
+                    <span>{max}잔 (MAX)</span>
+                </div>
+                </div>
+            );
+        };
+
+        const HeadacheGauge = ({ label, value, onChange }) => {
+            const segments = [1, 2, 3, 4, 5];
+            const emojis = ['😊', '🤔', '😣', '🤕', '🤯', '💀'];
+
+            return (
+                <div className="flex flex-col space-y-3 p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
+                <div className="flex justify-between items-center">
+                    <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{label}</span>
+                    <div className="flex items-center space-x-2">
+                    <span className="text-2xl">{emojis[value]}</span>
+                    <span className={`text-xl font-black ${value >= 3 ? 'text-red-500 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>
+                        Level {value}
+                    </span>
+                    </div>
+                </div>
+
+                <div className="flex space-x-1.5 h-10">
+                    {segments.map((seg) => {
+                    const isFilled = seg <= value;
+                    let filledColor = 'bg-blue-500';
+                    if (seg >= 4) filledColor = 'bg-red-500';
+                    else if (seg === 3) filledColor = 'bg-orange-500';
+
+                    return (
+                        <button
+                        key={seg}
+                        onClick={() => onChange(seg === value ? seg - 1 : seg)}
+                        className={`flex-1 rounded-lg transition-all duration-300 border-b-4 ${
+                            isFilled
+                            ? `${filledColor} border-black/20 scale-100 opacity-100 shadow-sm`
+                            : 'bg-gray-100 dark:bg-gray-700 border-transparent scale-95 opacity-50 hover:opacity-80'
+                        }`}
+                        />
+                    );
+                    })}
+                </div>
+
+                <div className="flex justify-between text-[10px] font-bold text-gray-400 dark:text-gray-500">
+                    <span>0 (없음)</span>
+                    <span className="text-orange-500">3 (경고)</span>
+                    <span className="text-red-500">5 (최악)</span>
+                </div>
+                </div>
+            );
+        };
+
+        const TextRadio = ({ label, value, onChange, options }) => (
+            <div className="flex flex-col space-y-3 p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
+                <span className="text-sm font-bold text-gray-800 dark:text-gray-200">{label}</span>
+                <div className="flex space-x-2 bg-gray-100 dark:bg-gray-900 p-1 rounded-xl">
+                {options.map((opt) => (
+                    <button
+                    key={opt}
+                    onClick={() => onChange(opt)}
+                    className={`flex-1 py-2.5 rounded-lg text-sm font-bold transition-all ${
+                        value === opt ? 'bg-white dark:bg-gray-700 text-blue-600 dark:text-blue-400 shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-800'
+                    }`}
+                    >
+                    {opt}
+                    </button>
+                ))}
+                </div>
+            </div>
+        );
+
+        // --- Main App Component ---
+        function App() {
+            // Theme State
+            const [isDarkMode, setIsDarkMode] = useState(() => {
+                const saved = localStorage.getItem('phls_theme');
+                return saved ? JSON.parse(saved) : true; 
+            });
+
+            // --- GAS 연동 설정 ---
+            const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwo5xUbBBY86JcAWsUYN8GqUShMHUGoBCuIh7uF37tqka-kYjLeaKnmUwXKyo5ztsqK/exec"; 
+
+            const [activeTab, setActiveTab] = useState('input');
+            const [showEmergency, setShowEmergency] = useState(false);
+
+            const initialForm = {
+                logDate: getTodayString(),
+                diet_tags: [], 
+                chew_30: false,
+                eat_slowly: false, 
+                fasting_4hr: false, 
+                water_cups: 0, 
+                headache_lv: 0,
+                indigestion: '편안', 
+                memo: ''
+            };
+
+            const [formData, setFormData] = useState(() => {
+                const saved = localStorage.getItem('phls_formData_v1_5');
+                if (saved) {
+                const parsed = JSON.parse(saved);
+                if (!parsed.logDate) parsed.logDate = getTodayString();
+                if (!parsed.diet_tags) parsed.diet_tags = [];
+                if (parsed.water_cups === undefined) parsed.water_cups = 0;
+                return parsed;
+                }
+                return initialForm;
+            });
+
+            const [logs, setLogs] = useState(() => {
+                const saved = localStorage.getItem('phls_logs_v1_5');
+                return saved ? JSON.parse(saved) : [];
+            });
+
+            const [emergencyData, setEmergencyData] = useState({
+                time: '',
+                headache_lv: 3,
+                indigestion: '불편', 
+                memo: '갑작스러운 두통/체기 감지'
+            });
+
+            useEffect(() => {
+                localStorage.setItem('phls_theme', JSON.stringify(isDarkMode));
+                if (isDarkMode) document.documentElement.classList.add('dark');
+                else document.documentElement.classList.remove('dark');
+            }, [isDarkMode]);
+
+            useEffect(() => localStorage.setItem('phls_formData_v1_5', JSON.stringify(formData)), [formData]);
+            useEffect(() => localStorage.setItem('phls_logs_v1_5', JSON.stringify(logs)), [logs]);
+
+            const updateForm = (key, value) => setFormData(prev => ({ ...prev, [key]: value }));
+
+            // 구글 시트로 데이터 전송
+            const sendDataToGoogleSheet = async (dataPayload) => {
+                if (!GAS_WEB_APP_URL) return; 
+                try {
+                    await fetch(GAS_WEB_APP_URL, {
+                        method: 'POST',
+                        mode: 'no-cors', 
+                        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                        body: JSON.stringify(dataPayload)
+                    });
+                } catch (error) {
+                    console.error("구글 시트 전송 실패:", error);
+                }
+            };
+
+            const handleSaveDaily = async () => {
+                const newLog = { 
+                ...formData, 
+                date: new Date().toISOString(),
+                targetDate: formData.logDate,
+                type: 'DAILY' 
+                };
+                
+                setLogs([newLog, ...logs]);
+                await sendDataToGoogleSheet(newLog);
+                
+                setFormData({ ...initialForm, logDate: getTodayString() }); 
+                setActiveTab('dashboard');
+                window.scrollTo(0, 0);
+                alert("구글 시트에 로그가 저장되었습니다.");
+            };
+
+            const handleSaveEmergency = async () => {
+                const newLog = { 
+                ...emergencyData, 
+                date: new Date().toISOString(), 
+                targetDate: getTodayString(),
+                type: 'EMERGENCY',
+                diet_tags: formData.diet_tags 
+                };
+                
+                setLogs([newLog, ...logs]);
+                await sendDataToGoogleSheet(newLog);
+                
+                setShowEmergency(false);
+                setActiveTab('dashboard');
+                window.scrollTo(0, 0);
+                alert("긴급 스냅샷이 구글 시트에 저장되었습니다.");
+            };
+
+            const openEmergencyLog = () => {
+                const now = new Date();
+                setEmergencyData({
+                ...emergencyData,
+                time: `${now.getHours()}:${now.getMinutes() < 10 ? '0' : ''}${now.getMinutes()}`
+                });
+                setShowEmergency(true);
+            };
+
+            const getAnalysis = () => {
+                const severeHeadaches = logs.filter(l => l.headache_lv >= 3);
+                const totalSevere = severeHeadaches.length;
+                
+                if (totalSevere === 0) return null;
+
+                const tagCounts = {};
+                severeHeadaches.forEach(log => {
+                if (log.diet_tags) {
+                    log.diet_tags.forEach(tag => {
+                    tagCounts[tag] = (tagCounts[tag] || 0) + 1;
+                    });
+                }
+                });
+
+                const topTags = Object.entries(tagCounts)
+                .sort((a, b) => b[1] - a[1])
+                .map(entry => ({ name: entry[0], count: entry[1], ratio: Math.round((entry[1] / totalSevere) * 100) }))
+                .slice(0, 2);
+
+                const fastingFailRate = Math.round((severeHeadaches.filter(l => l.fasting_4hr === false).length / totalSevere) * 100);
+                const fastEatingFailRate = Math.round((severeHeadaches.filter(l => l.eat_slowly === false).length / totalSevere) * 100);
+                const waterFailRate = Math.round((severeHeadaches.filter(l => l.water_cups <= 2).length / totalSevere) * 100);
+
+                return {
+                total: totalSevere,
+                topTags: topTags,
+                fastingFailRate,
+                fastEatingFailRate,
+                waterFailRate
+                };
+            };
+
+            const analysis = getAnalysis();
+
+            return (
+                <div className={`min-h-screen ${isDarkMode ? 'dark bg-gray-900' : 'bg-gray-50'}`}>
+                <div className="text-gray-900 dark:text-gray-100 font-sans pb-24 transition-colors duration-300">
+                    
+                    {/* Header */}
+                    <header className="bg-white dark:bg-gray-800 shadow-sm sticky top-0 z-10 transition-colors">
+                    <div className="max-w-md mx-auto px-4 py-4 flex justify-between items-center">
+                        <div className="flex items-center space-x-2">
+                        <Activity className="w-7 h-7 text-blue-600 dark:text-blue-400" />
+                        <h1 className="text-xl font-black tracking-tight">PHLS <span className="text-blue-600 dark:text-blue-400">Core</span></h1>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                        <button 
+                            onClick={() => setIsDarkMode(!isDarkMode)} 
+                            className="p-2.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                        >
+                            {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                        </button>
+                        </div>
+                    </div>
+                    
+                    {/* Navigation Tabs */}
+                    <div className="flex px-4 pb-0 bg-white dark:bg-gray-800 pt-2">
+                        <button 
+                        onClick={() => setActiveTab('input')}
+                        className={`flex-1 py-3 text-sm font-black border-b-[3px] transition-colors ${activeTab === 'input' ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-gray-400 dark:text-gray-500'}`}
+                        >
+                        Daily Input
+                        </button>
+                        <button 
+                        onClick={() => setActiveTab('dashboard')}
+                        className={`flex-1 py-3 text-sm font-black border-b-[3px] transition-colors ${activeTab === 'dashboard' ? 'border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400' : 'border-transparent text-gray-400 dark:text-gray-500'}`}
+                        >
+                        Dashboard
+                        </button>
+                    </div>
+                    </header>
+
+                    <main className="max-w-md mx-auto px-4 py-6">
+                    
+                    {/* --- INPUT TAB --- */}
+                    {activeTab === 'input' && (
+                        <div className="space-y-6">
+                        
+                        {/* Date Selector */}
+                        <div className="flex items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                            <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-300">
+                            <Calendar className="w-5 h-5" />
+                            <span className="font-bold text-sm">기록 날짜</span>
+                            </div>
+                            <input 
+                            type="date" 
+                            value={formData.logDate}
+                            onChange={(e) => updateForm('logDate', e.target.value)}
+                            className="font-bold text-gray-800 dark:text-gray-100 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-2 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition-colors"
+                            />
+                        </div>
+
+                        {/* 1. 식습관 (Input) */}
+                        <section className="space-y-3">
+                            <h2 className="text-lg font-black flex items-center text-gray-800 dark:text-gray-100 ml-1">
+                            <Coffee className="w-5 h-5 mr-2 text-amber-500" /> 1. 식습관 (Input)
+                            </h2>
+                            
+                            <TagSelector 
+                            label="위장 부하 유발 요인 (복수 선택)" 
+                            selectedTags={formData.diet_tags} 
+                            onChange={(v) => updateForm('diet_tags', v)}
+                            options={['🥩 육류', '🍞 밀가루', '💥 과식', '🌙 야식', '🍪 간식', '☕ 커피', '🍜 라면', '🥤 탄산음료']}
+                            />
+                            
+                            <ToggleButton 
+                            label="식사 시 30회 씹기" 
+                            value={formData.chew_30} 
+                            onChange={(v) => updateForm('chew_30', v)} 
+                            icon={CheckCircle} 
+                            />
+                            
+                            <ToggleButton 
+                            label="20분 이상 식사하기" 
+                            value={formData.eat_slowly} 
+                            onChange={(v) => updateForm('eat_slowly', v)} 
+                            icon={Clock} 
+                            />
+
+                            <ToggleButton 
+                            label="취침 전 공복 4시간 유지" 
+                            value={formData.fasting_4hr} 
+                            onChange={(v) => updateForm('fasting_4hr', v)} 
+                            icon={Moon} 
+                            />
+
+                            <div className="pt-2">
+                            <WaterGauge 
+                                label="하루 식간 수분 섭취 (1잔 ≈ 250ml)" 
+                                value={formData.water_cups} 
+                                onChange={(v) => updateForm('water_cups', v)} 
+                            />
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 ml-2">※ 식사 중 섭취 제외, 식간에 틈틈이</p>
+                            </div>
+                        </section>
+
+                        {/* 2. 결과 로그 (Outcome) */}
+                        <section className="space-y-3 pt-4">
+                            <h2 className="text-lg font-black flex items-center text-blue-600 dark:text-blue-400 ml-1">
+                            <FileText className="w-5 h-5 mr-2" /> 2. 결과 로그 (Outcome)
+                            </h2>
+                            <div className="bg-blue-50 dark:bg-blue-900/20 p-2 rounded-2xl border border-blue-100 dark:border-blue-900/50 space-y-3">
+                            <HeadacheGauge 
+                                label="현재 두통 강도" 
+                                value={formData.headache_lv} 
+                                onChange={(v) => updateForm('headache_lv', v)} 
+                            />
+                            <TextRadio 
+                                label="현재 체기 정도" 
+                                value={formData.indigestion} 
+                                onChange={(v) => updateForm('indigestion', v)} 
+                                options={['편안', '불편', '통증']} 
+                            />
+                            <div className="px-4 pb-2">
+                                <textarea 
+                                placeholder="특이사항 메모 (데이터 자동 저장 중...)" 
+                                value={formData.memo}
+                                onChange={(e) => updateForm('memo', e.target.value)}
+                                className="w-full p-4 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none text-sm resize-none h-24 shadow-sm"
+                                />
+                            </div>
+                            </div>
+                        </section>
+
+                        <button 
+                            onClick={handleSaveDaily}
+                            className="w-full bg-blue-600 dark:bg-blue-500 text-white font-black text-lg py-5 rounded-2xl shadow-xl hover:bg-blue-700 dark:hover:bg-blue-600 active:scale-[0.98] transition-all"
+                        >
+                            오늘의 로그 저장하기
+                        </button>
+                        </div>
+                    )}
+
+                    {/* --- DASHBOARD TAB --- */}
+                    {activeTab === 'dashboard' && (
+                        <div className="space-y-6">
+                        
+                        {analysis ? (
+                            <div className="bg-white dark:bg-gray-800 p-6 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 space-y-6 transition-colors">
+                            <div className="flex items-center space-x-2">
+                                <TrendingUp className="w-6 h-6 text-blue-500" />
+                                <h2 className="text-lg font-black text-gray-800 dark:text-gray-100">위장-두통 상관관계 리포트</h2>
+                            </div>
+                            
+                            <p className="text-sm font-medium text-gray-500 dark:text-gray-400">두통 Level 3 이상 발생 시 위장 습관 실패율입니다.</p>
+                            
+                            {analysis.topTags.length > 0 && (
+                                <div className="bg-orange-50 dark:bg-orange-900/20 p-5 rounded-2xl border border-orange-100 dark:border-orange-900/30">
+                                <h3 className="text-xs font-black text-orange-600 dark:text-orange-400 mb-3 uppercase tracking-wider">주요 유발 음식 태그</h3>
+                                <div className="space-y-3">
+                                    {analysis.topTags.map((tag, idx) => (
+                                    <div key={idx} className="flex justify-between items-center">
+                                        <span className="font-bold text-gray-800 dark:text-gray-200">{tag.name}</span>
+                                        <div className="flex items-center space-x-3">
+                                        <div className="w-24 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                            <div className="h-full bg-orange-500 rounded-full" style={{ width: `${tag.ratio}%` }}></div>
+                                        </div>
+                                        <span className="text-sm font-black text-orange-600 dark:text-orange-400 w-10 text-right">{tag.ratio}%</span>
+                                        </div>
+                                    </div>
+                                    ))}
+                                </div>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-2xl text-center border border-gray-100 dark:border-gray-700">
+                                <span className="block text-[11px] font-bold text-red-500 dark:text-red-400 mb-1">4시간 공복 실패율</span>
+                                <span className="text-2xl font-black text-gray-800 dark:text-gray-100">{analysis.fastingFailRate}%</span>
+                                </div>
+                                <div className="bg-gray-50 dark:bg-gray-900/50 p-4 rounded-2xl text-center border border-gray-100 dark:border-gray-700">
+                                <span className="block text-[11px] font-bold text-red-500 dark:text-red-400 mb-1">급한 식사 실패율</span>
+                                <span className="text-2xl font-black text-gray-800 dark:text-gray-100">{analysis.fastEatingFailRate}%</span>
+                                </div>
+                                <div className="col-span-2 bg-blue-50 dark:bg-blue-900/20 p-4 rounded-2xl text-center border border-blue-100 dark:border-blue-900/40">
+                                <div className="flex justify-center items-center space-x-2 mb-1">
+                                    <Droplets className="w-4 h-4 text-blue-500" />
+                                    <span className="block text-xs font-bold text-blue-600 dark:text-blue-400">수분 부족(2잔 이하) 상태 발생률</span>
+                                </div>
+                                <span className="text-2xl font-black text-blue-800 dark:text-blue-200">{analysis.waterFailRate}%</span>
+                                <p className="text-[10px] text-gray-500 mt-1">두통 발생일 기준, 뇌 혈류 부족 의심</p>
+                                </div>
+                            </div>
+                            </div>
+                        ) : (
+                            <div className="bg-white dark:bg-gray-800 p-8 rounded-3xl border border-dashed border-gray-300 dark:border-gray-700 text-center text-gray-500 dark:text-gray-400 transition-colors shadow-sm">
+                            <CheckCircle className="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+                            <p className="font-bold text-gray-700 dark:text-gray-300">건강한 상태가 유지되고 있습니다.</p>
+                            <p className="text-sm mt-2 font-medium">두통 레벨 3 이상의 에러가 발생해야 분석이 활성화됩니다.</p>
+                            </div>
+                        )}
+
+                        <h3 className="font-black text-gray-800 dark:text-gray-100 mt-8 mb-4 ml-1">타임라인 로그</h3>
+                        <div className="space-y-3">
+                            {logs.length === 0 ? (
+                            <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6 font-medium">기록된 로그가 없습니다.</p>
+                            ) : (
+                            logs.map((log, idx) => (
+                                <div key={idx} className="bg-white dark:bg-gray-800 p-5 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
+                                <div className="flex justify-between items-start mb-3">
+                                    <div className="flex flex-col">
+                                    <span className="text-xs font-bold text-gray-400 dark:text-gray-500 mb-1">
+                                        {log.targetDate || new Date(log.date).toISOString().split('T')[0]}
+                                    </span>
+                                    <span className={`text-[10px] font-black px-2.5 py-1 rounded-md w-fit ${log.type === 'EMERGENCY' ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}>
+                                        {log.type}
+                                    </span>
+                                    </div>
+                                    <div className="text-right">
+                                    <p className="text-sm font-black text-gray-800 dark:text-gray-200">
+                                        두통 {log.headache_lv} / 체기 {log.indigestion}
+                                    </p>
+                                    </div>
+                                </div>
+                                
+                                {log.diet_tags && log.diet_tags.length > 0 && (
+                                    <div className="flex flex-wrap gap-1.5 mb-2">
+                                    {log.diet_tags.map(tag => (
+                                        <span key={tag} className="text-[10px] bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 px-2 py-0.5 rounded font-bold border border-orange-100 dark:border-orange-800">
+                                        {tag.split(' ')[1] || tag}
+                                        </span>
+                                    ))}
+                                    </div>
+                                )}
+                                
+                                <div className="flex flex-wrap gap-2 mt-2">
+                                    {log.water_cups !== undefined && (
+                                    <span className="text-[10px] bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 px-2 py-1 rounded-lg font-bold border border-blue-100 dark:border-blue-800">
+                                        💧 수분 {log.water_cups}잔
+                                    </span>
+                                    )}
+                                    <span className={`text-[10px] px-2 py-1 rounded-lg font-bold border ${log.fasting_4hr ? 'bg-green-50 text-green-600 border-green-100 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' : 'bg-red-50 text-red-600 border-red-100 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800'}`}>
+                                    {log.fasting_4hr ? '공복 성공' : '공복 실패'}
+                                    </span>
+                                </div>
+
+                                {log.memo && <p className="text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 p-3 rounded-xl mt-3">{log.memo}</p>}
+                                </div>
+                            ))
+                            )}
+                        </div>
+                        </div>
+                    )}
+                    </main>
+
+                    {/* Floating Action Button for Emergency Log */}
+                    <button
+                    onClick={openEmergencyLog}
+                    className="fixed bottom-6 right-6 w-16 h-16 bg-red-500 text-white rounded-full shadow-red-500/30 shadow-2xl flex items-center justify-center hover:bg-red-600 transition-transform hover:scale-105 active:scale-95 z-40"
+                    title="Emergency Log (두통/체기 발생 시 즉시 기록)"
+                    >
+                    <AlertCircle className="w-8 h-8" />
+                    </button>
+
+                    {/* Emergency Log Modal */}
+                    {showEmergency && (
+                    <div className="fixed inset-0 bg-black/60 dark:bg-black/80 z-50 flex items-center justify-center p-4">
+                        <div className="bg-white dark:bg-gray-800 rounded-3xl w-full max-w-sm overflow-hidden shadow-2xl transition-colors">
+                        <div className="bg-red-500 p-5 text-white flex justify-between items-center">
+                            <div className="flex items-center space-x-2">
+                            <AlertTriangle className="w-6 h-6" />
+                            <h3 className="font-black text-lg">긴급 에러 스냅샷</h3>
+                            </div>
+                            <button onClick={() => setShowEmergency(false)}><XCircle className="w-7 h-7 opacity-80 hover:opacity-100 transition-opacity" /></button>
+                        </div>
+                        
+                        <div className="p-6 space-y-5">
+                            <p className="text-sm text-gray-600 dark:text-gray-300 font-medium">현재 시각 <strong className="text-gray-900 dark:text-white">({emergencyData.time})</strong> 기준, 직전 행동 패턴을 캡처합니다.</p>
+                            
+                            <HeadacheGauge 
+                            label="현재 두통 강도" 
+                            value={emergencyData.headache_lv} 
+                            onChange={(v) => setEmergencyData({...emergencyData, headache_lv: v})} 
+                            />
+                            
+                            <TextRadio 
+                            label="현재 체기 정도" 
+                            value={emergencyData.indigestion} 
+                            onChange={(v) => setEmergencyData({...emergencyData, indigestion: v})} 
+                            options={['편안', '불편', '통증']} 
+                            />
+                            
+                            <div className="flex flex-col space-y-2">
+                            <span className="text-sm font-bold text-gray-800 dark:text-gray-200">원인 추정 메모 (선택)</span>
+                            <textarea 
+                                value={emergencyData.memo}
+                                onChange={(e) => setEmergencyData({...emergencyData, memo: e.target.value})}
+                                className="w-full p-4 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-sm h-24 resize-none transition-colors"
+                            />
+                            </div>
+
+                            <button 
+                            onClick={handleSaveEmergency}
+                            className="w-full bg-red-500 text-white font-black text-lg py-4 rounded-xl shadow-lg shadow-red-500/20 hover:bg-red-600 active:scale-95 transition-all mt-4"
+                            >
+                            즉시 기록 저장
+                            </button>
+                        </div>
+                        </div>
+                    </div>
+                    )}
+                </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
