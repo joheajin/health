@@ -87,20 +87,20 @@
                 </div>
                 <div className="flex space-x-2 bg-gray-100 dark:bg-gray-900 p-1 rounded-xl">
                 <button
-                    onClick={() => onChange(true)}
-                    className={`px-5 py-2 rounded-lg font-bold transition-all ${
-                    value === true ? 'bg-blue-500 text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
-                    }`}
-                >
-                    O
-                </button>
-                <button
                     onClick={() => onChange(false)}
                     className={`px-5 py-2 rounded-lg font-bold transition-all ${
                     value === false ? 'bg-red-500 text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
                     }`}
                 >
                     X
+                </button>
+                <button
+                    onClick={() => onChange(true)}
+                    className={`px-5 py-2 rounded-lg font-bold transition-all ${
+                    value === true ? 'bg-blue-500 text-white shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+                    }`}
+                >
+                    O
                 </button>
                 </div>
             </div>
@@ -566,7 +566,7 @@
                             onClick={handleSaveDaily}
                             className="w-full bg-blue-600 dark:bg-blue-500 text-white font-black text-lg py-5 rounded-2xl shadow-xl hover:bg-blue-700 dark:hover:bg-blue-600 active:scale-[0.98] transition-all"
                         >
-                            오늘의 로그 저장하기
+                            기록 저장
                         </button>
                         </div>
                     )}
