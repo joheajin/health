@@ -60,18 +60,6 @@
             return `${year}-${month}-${day}`;
         };
 
-        // 엑셀 시트용 직관적인 한국 시간 포맷 생성 함수
-        const getFormattedTimestamp = () => {
-            const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const hours = String(now.getHours()).padStart(2, '0');
-            const minutes = String(now.getMinutes()).padStart(2, '0');
-            const seconds = String(now.getSeconds()).padStart(2, '0');
-            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-        };
-
         // --- Components ---
         const ToggleButton = ({ label, value, onChange, icon: Icon }) => (
             <div className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 transition-colors">
@@ -328,13 +316,21 @@
             const handleSaveDaily = async () => {
                 const newLog = { 
                 ...formData, 
-                date: getFormattedTimestamp(), // 한국 시간 포맷 적용
+                date: new Date().toISOString(), // 로컬용 시간 (앱 내 정렬/구분용)
                 targetDate: formData.logDate,
                 type: 'DAILY' 
                 };
                 
+                // 구글 시트용 데이터 클렌징 (이모지 제거, 날짜 덮어쓰기)
+                const sheetPayload = {
+                    ...newLog,
+                    date: formData.logDate, // A열(기록시간)에 선택한 달력 날짜 덮어쓰기
+                    targetDate: formData.logDate, // B열(목표날짜)에 선택한 달력 날짜 덮어쓰기
+                    diet_tags: newLog.diet_tags.map(tag => tag.includes(' ') ? tag.split(' ')[1] : tag) // 이모지 제거 ("🥩 육류" -> "육류")
+                };
+
                 setLogs([newLog, ...logs]);
-                await sendDataToGoogleSheet(newLog);
+                await sendDataToGoogleSheet(sheetPayload);
                 
                 setFormData({ ...initialForm, logDate: getTodayString() }); 
                 setActiveTab('dashboard');
@@ -345,14 +341,22 @@
             const handleSaveEmergency = async () => {
                 const newLog = { 
                 ...emergencyData, 
-                date: getFormattedTimestamp(), // 한국 시간 포맷 적용
+                date: new Date().toISOString(), // 로컬용 시간
                 targetDate: getTodayString(),
                 type: 'EMERGENCY',
                 diet_tags: formData.diet_tags 
                 };
                 
+                // 구글 시트용 데이터 클렌징
+                const sheetPayload = {
+                    ...newLog,
+                    date: getTodayString(), // 긴급 에러도 오늘 날짜로 덮어쓰기
+                    targetDate: getTodayString(),
+                    diet_tags: newLog.diet_tags ? newLog.diet_tags.map(tag => tag.includes(' ') ? tag.split(' ')[1] : tag) : []
+                };
+
                 setLogs([newLog, ...logs]);
-                await sendDataToGoogleSheet(newLog);
+                await sendDataToGoogleSheet(sheetPayload);
                 
                 setShowEmergency(false);
                 setActiveTab('dashboard');
@@ -452,7 +456,7 @@
                         <div className="flex items-center justify-between bg-white dark:bg-gray-800 p-4 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
                             <div className="flex items-center space-x-2 text-gray-600 dark:text-gray-300">
                             <Calendar className="w-5 h-5" />
-                            <span className="font-bold text-sm">기록 날짜</span>
+                            <span className="font-bold text-sm">기록일</span>
                             </div>
                             <input 
                             type="date" 
