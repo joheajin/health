@@ -22,6 +22,11 @@
         /* 모바일 터치 하이라이트 제거 */
         * { -webkit-tap-highlight-color: transparent; }
         body { background-color: #111827; } /* 다크모드 로딩 시 번쩍임 방지 */
+        
+        /* 다크모드 시 네이티브 달력 아이콘 색상 반전 (흰색으로) */
+        html.dark input[type="date"]::-webkit-calendar-picker-indicator {
+            filter: invert(1);
+        }
     </style>
 </head>
 <body>
@@ -58,6 +63,17 @@
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const day = String(now.getDate()).padStart(2, '0');
             return `${year}-${month}-${day}`;
+        };
+
+        const getFormattedTimestamp = () => {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
         };
 
         // --- Components ---
@@ -257,6 +273,7 @@
                 chew_30: false,
                 eat_slowly: false, 
                 fasting_4hr: false, 
+                bowel_movement: false, // 배변활동 유무 추가
                 water_cups: 0, 
                 headache_lv: 0,
                 indigestion: '편안', 
@@ -266,11 +283,12 @@
             const [formData, setFormData] = useState(() => {
                 const saved = localStorage.getItem('phls_formData_v1_5');
                 if (saved) {
-                const parsed = JSON.parse(saved);
-                if (!parsed.logDate) parsed.logDate = getTodayString();
-                if (!parsed.diet_tags) parsed.diet_tags = [];
-                if (parsed.water_cups === undefined) parsed.water_cups = 0;
-                return parsed;
+                    const parsed = JSON.parse(saved);
+                    if (!parsed.logDate) parsed.logDate = getTodayString();
+                    if (!parsed.diet_tags) parsed.diet_tags = [];
+                    if (parsed.water_cups === undefined) parsed.water_cups = 0;
+                    if (parsed.bowel_movement === undefined) parsed.bowel_movement = false;
+                    return parsed;
                 }
                 return initialForm;
             });
@@ -315,19 +333,18 @@
 
             const handleSaveDaily = async () => {
                 const newLog = { 
-                ...formData, 
-                date: new Date().toISOString(), // 앱 내부 정렬용 고유값
-                logDate: formData.logDate, // 기록일 추가
-                type: 'DAILY' 
+                    ...formData, 
+                    date: new Date().toISOString(), // 앱 내부 정렬용 고유값
+                    logDate: formData.logDate,
+                    type: 'DAILY' 
                 };
                 
                 // 구글 시트용 데이터 클렌징 (이모지 제거, 기록일 통합)
                 const sheetPayload = {
                     ...newLog,
-                    date: formData.logDate, // A열(기록일)에 달력 날짜 1개만 매핑
+                    date: formData.logDate, // A열(기록일)
                     diet_tags: newLog.diet_tags.map(tag => tag.includes(' ') ? tag.split(' ')[1] : tag) 
                 };
-                // targetDate는 삭제되었습니다.
 
                 setLogs([newLog, ...logs]);
                 await sendDataToGoogleSheet(sheetPayload);
@@ -340,20 +357,20 @@
 
             const handleSaveEmergency = async () => {
                 const newLog = { 
-                ...emergencyData, 
-                date: new Date().toISOString(), 
-                logDate: getTodayString(), // 긴급은 오늘 날짜로 기록일 지정
-                type: 'EMERGENCY',
-                diet_tags: formData.diet_tags 
+                    ...emergencyData, 
+                    date: new Date().toISOString(), 
+                    logDate: getTodayString(),
+                    type: 'EMERGENCY',
+                    diet_tags: formData.diet_tags,
+                    bowel_movement: formData.bowel_movement
                 };
                 
                 // 구글 시트용 데이터 클렌징
                 const sheetPayload = {
                     ...newLog,
-                    date: getTodayString(), // A열(기록일)에 오늘 날짜 매핑
+                    date: getTodayString(), // A열(기록일)
                     diet_tags: newLog.diet_tags ? newLog.diet_tags.map(tag => tag.includes(' ') ? tag.split(' ')[1] : tag) : []
                 };
-                // targetDate는 삭제되었습니다.
 
                 setLogs([newLog, ...logs]);
                 await sendDataToGoogleSheet(sheetPayload);
@@ -500,6 +517,13 @@
                             icon={Moon} 
                             />
 
+                            <ToggleButton 
+                            label="배변활동 유무" 
+                            value={formData.bowel_movement} 
+                            onChange={(v) => updateForm('bowel_movement', v)} 
+                            icon={CheckCircle} 
+                            />
+
                             <div className="pt-2">
                             <WaterGauge 
                                 label="하루 식간 수분 섭취 (1잔 ≈ 250ml)" 
@@ -616,7 +640,6 @@
                                 <div className="flex justify-between items-start mb-3">
                                     <div className="flex flex-col">
                                     <span className="text-xs font-bold text-gray-400 dark:text-gray-500 mb-1">
-                                        {/* 기록일만 깔끔하게 표시되도록 수정 */}
                                         {log.logDate || log.targetDate || (log.date && typeof log.date === 'string' && log.date.includes('T') ? log.date.split('T')[0] : log.date)}
                                     </span>
                                     <span className={`text-[10px] font-black px-2.5 py-1 rounded-md w-fit ${log.type === 'EMERGENCY' ? 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}>
@@ -649,6 +672,11 @@
                                     <span className={`text-[10px] px-2 py-1 rounded-lg font-bold border ${log.fasting_4hr ? 'bg-green-50 text-green-600 border-green-100 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800' : 'bg-red-50 text-red-600 border-red-100 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800'}`}>
                                     {log.fasting_4hr ? '공복 성공' : '공복 실패'}
                                     </span>
+                                    {log.bowel_movement !== undefined && (
+                                    <span className={`text-[10px] px-2 py-1 rounded-lg font-bold border ${log.bowel_movement ? 'bg-indigo-50 text-indigo-600 border-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-400 dark:border-indigo-800' : 'bg-gray-50 text-gray-500 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700'}`}>
+                                        {log.bowel_movement ? '배변 O' : '배변 X'}
+                                    </span>
+                                    )}
                                 </div>
 
                                 {log.memo && <p className="text-sm font-medium text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900 p-3 rounded-xl mt-3">{log.memo}</p>}
